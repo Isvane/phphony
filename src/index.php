@@ -20,41 +20,90 @@ while (true) {
         break;
     }
 
-    $line = fgets($conn);
+    $buffer = '';
 
-    if ($line !== false) {
-        $trimmed = trim($line);
-        $parts = explode(' ', $trimmed, 3);
+    while (!feof($conn)) {
+        $chunk = fread($conn, 1024);
 
-        if (count($parts) === 3) {
-            [$method, $target, $version] = $parts;
-
-            $path = parse_url($target, PHP_URL_PATH) ?? '/';
-            $query = parse_url($target, PHP_URL_QUERY) ?? '';
-
-            $queryParams = [];
-            if ($query !== false) {
-                parse_str($query, $queryParams);
-            }
-
-            echo "Method: {$method}\n";
-            echo "Path: {$path}\n";
-            echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
+        if ($chunk === false || $chunk === '') {
+            break;
         }
-        echo 'Received: ' . $line;
 
-        $body = 'Hello PHP';
-        $response =
-            "HTTP/1.1 200 OK\r\n"
-            . "Content-Type: text/plain\r\n"
-            . 'Content-Length: '
-            . strlen($body)
-            . "\r\n"
-            . "Connection: close\r\n\r\n"
-            . $body;
+        $buffer .= $chunk;
 
-        fwrite($conn, $response);
+        if (!str_contains($buffer, "\r\n\r\n")) {
+            fclose($conn);
+            continue;
+        }
     }
+
+    [$rawHeaders, $body] = explode("\r\n\r\n", $buffer, 2);
+
+    $contentLen = 0;
+    foreach (explode("\r\n", $rawHeaders) as $line) {
+        if (stripos($line, 'Content-Length:') !== 0) {
+            continue;
+        }
+
+        $contentLen = (int) trim(substr($line, 15));
+        break;
+    }
+
+    while (strlen($body) < $contentLen && !feof($conn)) {
+        $remainingBytes = $contentLen - strlen($body);
+        $chunk = fread($conn, $remainingBytes);
+
+        if ($chunk === false || $chunk === '') {
+            break;
+        }
+
+        $body .= $chunk;
+    }
+
+    $headerLines = explode("\r\n", $rawHeaders);
+    $reqLines = $headerLines[0];
+
+    $reqParts = explode(' ', $reqLines, 3);
+
+    $method = null;
+    $path = null;
+    $queryParams = null;
+    if (count($reqParts) === 3) {
+        [$method, $target, $version] = $reqParts;
+
+        $path = parse_url($target, PHP_URL_PATH) ?? '/';
+        $query = parse_url($target, PHP_URL_QUERY) ?? '';
+
+        $queryParams = [];
+        if ($query !== false) {
+            parse_str($query, $queryParams);
+        }
+    }
+
+    if ($method === null) {
+        fwrite($conn, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+        fclose($conn);
+        continue;
+    }
+
+    echo "Method: {$method}\n";
+    echo "Path: {$path}\n";
+    echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
+
+    $resBody = 'Hello PHP';
+
+    echo "Received: {$body}\n";
+
+    $response =
+        "HTTP/1.1 200 OK\r\n"
+        . "Content-Type: text/plain\r\n"
+        . 'Content-Length: '
+        . strlen($resBody)
+        . "\r\n"
+        . "Connection: close\r\n\r\n"
+        . $resBody;
+
+    fwrite($conn, $response);
 
     fclose($conn);
 }
