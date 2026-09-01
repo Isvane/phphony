@@ -100,7 +100,7 @@ while (true) {
             $resBody = "I'm Isvane, a 3rd year college student\n";
             break;
         default:
-            $resHeader = 'HTTP/1.1 404 Not Found\r\n';
+            $resHeader = "HTTP/1.1 404 Not Found\r\n";
             $resBody = 'Page not found\n';
             break;
     }
