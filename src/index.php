@@ -23,6 +23,24 @@ while (true) {
     $line = fgets($conn);
 
     if ($line !== false) {
+        $trimmed = trim($line);
+        $parts = explode(' ', $trimmed, 3);
+
+        if (count($parts) === 3) {
+            [$method, $target, $version] = $parts;
+
+            $path = parse_url($target, PHP_URL_PATH) ?? '/';
+            $query = parse_url($target, PHP_URL_QUERY) ?? '';
+
+            $queryParams = [];
+            if ($query !== false) {
+                parse_str($query, $queryParams);
+            }
+
+            echo "Method: {$method}\n";
+            echo "Path: {$path}\n";
+            echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
+        }
         echo 'Received: ' . $line;
 
         $body = 'Hello PHP';
