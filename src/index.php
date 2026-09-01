@@ -23,13 +23,14 @@ if (!function_exists('parse_http')) {
             return null;
         }
 
-        [$method, $path] = $parts;
+        $method = $parts[0];
+        $path = $parts[1] ?? '/';
         $headers = [];
 
         foreach ($lines as $line) {
             $kv = explode(':', $line, 2);
             if (count($kv) === 2) {
-                $headers[strtolower(trim($kv[0]))] = trim($kv[1]);
+                $headers[strtolower(trim($kv[0]))] = trim($kv[1] ?? '');
             }
         }
 
