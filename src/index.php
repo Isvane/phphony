@@ -31,9 +31,8 @@ while (true) {
 
         $buffer .= $chunk;
 
-        if (!str_contains($buffer, "\r\n\r\n")) {
-            fclose($conn);
-            continue;
+        if (str_contains($buffer, "\r\n\r\n")) {
+            break;
         }
     }
 
@@ -90,12 +89,26 @@ while (true) {
     echo "Path: {$path}\n";
     echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
 
-    $resBody = 'Hello PHP';
+    $resBody = '';
+    $resHeader = "HTTP/1.1 200 OK\r\n";
+
+    switch ($path) {
+        case '/':
+            $resBody = "Welcome to my first PHP project\n";
+            break;
+        case '/about':
+            $resBody = "I'm Isvane, a 3rd year college student\n";
+            break;
+        default:
+            $resHeader = 'HTTP/1.1 404 Not Found\r\n';
+            $resBody = 'Page not found\n';
+            break;
+    }
 
     echo "Received: {$body}\n";
 
     $response =
-        "HTTP/1.1 200 OK\r\n"
+        $resHeader
         . "Content-Type: text/plain\r\n"
         . 'Content-Length: '
         . strlen($resBody)
