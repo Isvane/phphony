@@ -6,5 +6,7 @@
             "email": "277444536+Isvane@users.noreply.github.com"
         }
     ],
-    "require": {}
+    "require": {
+        "react/socket": "^1.17"
+    }
 }

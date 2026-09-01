@@ -2,11 +2,16 @@
 
 ### Native PHP
 ```bash
+# Install deps and run
+composer install
 php src/index.php
 ```
 
 ### Rust FFI
 ```bash
+# Install deps
+composer install
+
 # Install cargo-php
 cargo install cargo-php --locked
 
