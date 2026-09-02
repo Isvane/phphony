@@ -8,7 +8,7 @@ use React\Socket\SocketServer;
 use React\Socket\ConnectionInterface;
 
 /**
- * @return array{method: string, path: string, headers: array<string, string>}|null
+ * @return array{method: string, path: string, headers: array<string, string>, offset: int}|null
  */
 
 if (!function_exists('parse_http')) {
@@ -42,7 +42,8 @@ if (!function_exists('parse_http')) {
         return [
             'method' => $method,
             'path' => $path,
-            'headers' => $headers
+            'headers' => $headers,
+            'offset' => $headerEnd + 4
         ];
     }
 }
@@ -66,15 +67,18 @@ $server->on('connection', function (ConnectionInterface $connection) {
             return;
         }
 
-        /** @var array{method: string, path: string, headers: array<string, string>} $parsed */
+        /** @var array{method: string, path: string, headers: array<string, string>, offset: int} $parsed */
         $method = $parsed['method'];
         $target = $parsed['path'];
         $headers = $parsed['headers'];
+        $offset = $parsed['offset'];
 
         $contentLength = (int) ( $headers['content-length'] ?? 0 );
 
-        $parts = explode("\r\n\r\n", $buffer, 2);
-        $body = $parts[1] ?? '';
+        if (strlen($buffer) < ( $offset + $contentLength )) {
+            return;
+        }
+        $body = substr($buffer, $offset, $contentLength);
 
         if (strlen($body) < $contentLength) {
             return;
