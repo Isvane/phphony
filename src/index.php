@@ -11,6 +11,7 @@ use React\Socket\ConnectionInterface;
  * @return array{method: string, path: string, headers: array<string, string>, offset: int}|null
  */
 
+// Fallback for when not using the Rust FFI.
 if (!function_exists('parse_http')) {
     function parse_http(string $buffer): ?array
     {
@@ -106,25 +107,37 @@ $server->on('connection', function (ConnectionInterface $connection) {
         echo 'Headers: ' . json_encode($headers, JSON_THROW_ON_ERROR) . "\n";
         echo 'Body: ' . json_encode($parsedBody, JSON_THROW_ON_ERROR) . "\n";
 
+        $file_path = 'public/index.html';
         $resBody = '';
         $resHeader = "HTTP/1.1 200 OK\r\n";
+        $contentType = 'text/html; charset=utf-8';
 
         switch ($path) {
             case '/':
-                $resBody = "Welcome to my first PHP project\n";
+                $resBody = file_get_contents($file_path);
+
+                if ($resBody === false) {
+                    $resHeader = "HTTP/1.1 500 Internal Server Error\r\n";
+                    $resBody = "Internal Server Error: Unable to load file\n";
+                    $contentType = 'text/plain; charset=utf-8';
+                }
+
+                $contentType = 'text/html; charset=utf-8';
                 break;
             case '/about':
                 $resBody = "I'm Isvane, a 3rd year college student\n";
+                $contentType = 'text/plain; charset=utf-8';
                 break;
             default:
                 $resHeader = "HTTP/1.1 404 Not Found\r\n";
                 $resBody = "Page not found\n";
+                $contentType = 'text/plain; charset=utf-8';
                 break;
         }
 
         $response =
             $resHeader
-            . "Content-Type: text/plain\r\n"
+            . "Content-Type: {$contentType}\r\n"
             . 'Content-Length: '
             . strlen($resBody)
             . "\r\n"
