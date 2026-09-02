@@ -80,6 +80,13 @@ $server->on('connection', function (ConnectionInterface $connection) {
             return;
         }
 
+        $parsedBody = [];
+        if (str_contains($headers['content-type'] ?? '', 'application/json')) {
+            /** @var array<string, mixed>|null $decoded */
+            $decoded = json_decode($body, true);
+            $parsedBody = is_array($decoded) ? $decoded : [];
+        }
+
         $rawPath = parse_url($target, PHP_URL_PATH);
         $path = is_string($rawPath) ? $rawPath : '/';
 
@@ -93,6 +100,7 @@ $server->on('connection', function (ConnectionInterface $connection) {
         echo "Path: {$path}\n";
         echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
         echo 'Headers: ' . json_encode($headers, JSON_THROW_ON_ERROR) . "\n";
+        echo 'Body: ' . json_encode($parsedBody, JSON_THROW_ON_ERROR) . "\n";
 
         $resBody = '';
         $resHeader = "HTTP/1.1 200 OK\r\n";
