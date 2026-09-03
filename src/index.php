@@ -107,37 +107,53 @@ $server->on('connection', function (ConnectionInterface $connection) {
         echo 'Headers: ' . json_encode($headers, JSON_THROW_ON_ERROR) . "\n";
         echo 'Body: ' . json_encode($parsedBody, JSON_THROW_ON_ERROR) . "\n";
 
-        $file_path = 'public/index.html';
+        $mime = [
+            'css' => 'text/css',
+            'html' => 'text/html',
+            'js' => 'application/javascript',
+            'json' => 'application/json',
+            'jpg' => 'image/jpeg',
+            'png' => 'image/png',
+            'pdf' => 'application/pdf',
+            'txt' => 'text/plain'
+        ];
 
-        [$resHeader, $resBody, $contentType] = match ($path) {
-            '/' => ( function () use ($file_path) {
-                $content = file_get_contents($file_path);
+        $relativePath = $path === '/' ? '/index.html' : $path;
+        $publicDir = realpath(__DIR__ . '/../public');
+        $targetFile = realpath((string) $publicDir . '/' . ltrim($relativePath, '/'));
 
-                if ($content === false) {
-                    return [
-                        "HTTP/1.1 500 Internal Server Error\r\n",
-                        "Internal Server Error: Unable to load file\n",
-                        'text/plain; charset=utf-8'
-                    ];
-                }
+        if (
+            $publicDir !== false
+            && $targetFile !== false
+            && str_starts_with($targetFile, $publicDir)
+            && is_file($targetFile)
+        ) {
+            $ext = pathinfo($targetFile, PATHINFO_EXTENSION);
+            $contentType = $mime[$ext] ?? 'application/octet-stream';
+            $content = file_get_contents($targetFile);
 
-                return [
+            if ($content !== false) {
+                $resHeader = "HTTP/1.1 200 OK\r\n";
+                $resBody = $content;
+            } else {
+                $resHeader = "HTTP/1.1 500 Internal Server Error\r\n";
+                $resBody = "Unable to read file\n";
+                $contentType = 'text/plain; charset=utf-8';
+            }
+        } else {
+            [$resHeader, $resBody, $contentType] = match ($path) {
+                '/about' => [
                     "HTTP/1.1 200 OK\r\n",
-                    $content,
-                    'text/html; charset=utf-8'
-                ];
-            } )(),
-            '/about' => [
-                "HTTP/1.1 200 OK\r\n",
-                "I'm Isvane, a 3rd year college student\n",
-                'text/plain; charset=utf-8'
-            ],
-            default => [
-                "HTTP/1.1 404 Not Found\r\n",
-                "Page not found\n",
-                'text/plain; charset=utf-8'
-            ]
-        };
+                    "I'm Isvane, a 3rd year college student\n",
+                    'text/plain; charset=utf-8'
+                ],
+                default => [
+                    "HTTP/1.1 404 Not Found\r\n",
+                    "Page not found\n",
+                    'text/plain; charset=utf-8'
+                ]
+            };
+        }
 
         $response =
             $resHeader
