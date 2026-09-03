@@ -108,32 +108,36 @@ $server->on('connection', function (ConnectionInterface $connection) {
         echo 'Body: ' . json_encode($parsedBody, JSON_THROW_ON_ERROR) . "\n";
 
         $file_path = 'public/index.html';
-        $resBody = '';
-        $resHeader = "HTTP/1.1 200 OK\r\n";
-        $contentType = 'text/html; charset=utf-8';
 
-        switch ($path) {
-            case '/':
-                $resBody = file_get_contents($file_path);
+        [$resHeader, $resBody, $contentType] = match ($path) {
+            '/' => ( function () use ($file_path) {
+                $content = file_get_contents($file_path);
 
-                if ($resBody === false) {
-                    $resHeader = "HTTP/1.1 500 Internal Server Error\r\n";
-                    $resBody = "Internal Server Error: Unable to load file\n";
-                    $contentType = 'text/plain; charset=utf-8';
+                if ($content === false) {
+                    return [
+                        "HTTP/1.1 500 Internal Server Error\r\n",
+                        "Internal Server Error: Unable to load file\n",
+                        'text/plain; charset=utf-8'
+                    ];
                 }
 
-                $contentType = 'text/html; charset=utf-8';
-                break;
-            case '/about':
-                $resBody = "I'm Isvane, a 3rd year college student\n";
-                $contentType = 'text/plain; charset=utf-8';
-                break;
-            default:
-                $resHeader = "HTTP/1.1 404 Not Found\r\n";
-                $resBody = "Page not found\n";
-                $contentType = 'text/plain; charset=utf-8';
-                break;
-        }
+                return [
+                    "HTTP/1.1 200 OK\r\n",
+                    $content,
+                    'text/html; charset=utf-8'
+                ];
+            } )(),
+            '/about' => [
+                "HTTP/1.1 200 OK\r\n",
+                "I'm Isvane, a 3rd year college student\n",
+                'text/plain; charset=utf-8'
+            ],
+            default => [
+                "HTTP/1.1 404 Not Found\r\n",
+                "Page not found\n",
+                'text/plain; charset=utf-8'
+            ]
+        };
 
         $response =
             $resHeader
