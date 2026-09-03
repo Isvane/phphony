@@ -2,24 +2,82 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Isvane</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isvane | phphony</title>
+    <style>
+        :root {
+            color-scheme: dark light;
+            --bg: #0d1117;
+            --card-bg: #161b22;
+            --text: #c9d1d9;
+            --heading: #f0f6fc;
+            --accent: #38bdf8;
+            --border: #30363d;
+            --status: #238636;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f6f8fa;
+                --card-bg: #ffffff;
+                --text: #24292f;
+                --heading: #0f172a;
+                --accent: #0284c7;
+                --border: #d0d7de;
+            }
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 620px;
+            margin: 0 auto;
+            padding: 3rem 1.25rem;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        h1, h2 { color: var(--heading); margin-bottom: 0.5rem; }
+
+        pre {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.875rem;
+            color: var(--accent);
+        }
+
+        ul { padding-left: 1.2rem; }
+        li { margin-bottom: 0.4rem; }
+    </style>
 </head>
 <body>
-    <h1>phphony</h1>
 
-    <p>First PHP project. Usually writing Rust or Go for backend stuff, but setting up raw socket listeners in PHP is surprisingly fun.</p>
+    <header>
+        <h1>phphony</h1>
+    </header>
 
-    <pre>
-Method:  GET
-Path:    /
-Engine:  PHP CLI raw socket loop
-    </pre>
+    <main>
+        <p>
+            First PHP project. Usually writing Rust and Go for backend stuff, but setting up raw socket listeners in PHP is surprisingly fun.
+        </p>
 
-    <h2>something about me:</h2>
-    <ul>
-        <li>3rd year CS (Indonesia)</li>
-        <li>Learning: C, PHP</li>
-        <li>Current background music: Pink Floyd, Oasis, The Strokes</li>
-    </ul>
+        <pre><code>Method:   GET
+Path:     /
+Engine:   PHP CLI raw socket loop</code></pre>
+
+        <section>
+            <h2>about me</h2>
+            <ul>
+                <li>3rd year CS student based in Indonesia</li>
+                <li><strong>Learning:</strong> C, PHP</li>
+                <li><strong>On repeat:</strong> Pink Floyd, Oasis, The Strokes</li>
+            </ul>
+        </section>
+    </main>
+
 </body>
 </html>
