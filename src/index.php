@@ -49,6 +49,18 @@ if (!function_exists('parse_http')) {
     }
 }
 
+function get_response(string $resHeader, string $resBody, string $contentType) {
+    $response = $resHeader
+    . "Content-Type: {$contentType}\r\n"
+    . 'Content-Length: '
+    . strlen($resBody)
+    . "\r\n"
+    . "Connection: close\r\n\r\n"
+    . $resBody;
+
+    return $response;
+}
+
 $server = new SocketServer('127.0.0.1:8000');
 
 $server->on('connection', function (ConnectionInterface $connection) {
@@ -137,15 +149,8 @@ $server->on('connection', function (ConnectionInterface $connection) {
                 $resBody = "Unable to read file\n";
                 $contentType = 'text/plain; charset=utf-8';
 
-                // TODO: Make this a helper later to keep it DRY
-                $response =
-                    $resHeader
-                    . "Content-Type: {$contentType}\r\n"
-                    . 'Content-Length: '
-                    . strlen($resBody)
-                    . "\r\n"
-                    . "Connection: close\r\n\r\n"
-                    . $resBody;
+                $response = get_response($resHeader, $resBody, $contentType);
+
                 $connection->end($response);
 
                 return;
@@ -154,14 +159,8 @@ $server->on('connection', function (ConnectionInterface $connection) {
             $resHeader = "HTTP/1.1 200 OK\r\n";
             $resBody = $content;
 
-            $response =
-                $resHeader
-                . "Content-Type: {$contentType}\r\n"
-                . 'Content-Length: '
-                . strlen($resBody)
-                . "\r\n"
-                . "Connection: close\r\n\r\n"
-                . $resBody;
+            $response = get_response($resHeader, $resBody, $contentType);
+
             $connection->end($response);
 
             return;
@@ -180,14 +179,7 @@ $server->on('connection', function (ConnectionInterface $connection) {
             ]
         };
 
-        $response =
-            $resHeader
-            . "Content-Type: {$contentType}\r\n"
-            . 'Content-Length: '
-            . strlen($resBody)
-            . "\r\n"
-            . "Connection: close\r\n\r\n"
-            . $resBody;
+        $response = get_response($resHeader, $resBody, $contentType);
 
         $connection->end($response);
     });
