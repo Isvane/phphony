@@ -132,28 +132,53 @@ $server->on('connection', function (ConnectionInterface $connection) {
             $contentType = $mime[$ext] ?? 'application/octet-stream';
             $content = file_get_contents($targetFile);
 
-            if ($content !== false) {
-                $resHeader = "HTTP/1.1 200 OK\r\n";
-                $resBody = $content;
-            } else {
+            if ($content === false) {
                 $resHeader = "HTTP/1.1 500 Internal Server Error\r\n";
                 $resBody = "Unable to read file\n";
                 $contentType = 'text/plain; charset=utf-8';
+
+                // TODO: Make this a helper later to keep it DRY
+                $response =
+                    $resHeader
+                    . "Content-Type: {$contentType}\r\n"
+                    . 'Content-Length: '
+                    . strlen($resBody)
+                    . "\r\n"
+                    . "Connection: close\r\n\r\n"
+                    . $resBody;
+                $connection->end($response);
+
+                return;
             }
-        } else {
-            [$resHeader, $resBody, $contentType] = match ($path) {
-                '/about' => [
-                    "HTTP/1.1 200 OK\r\n",
-                    "I'm Isvane, a 3rd year college student\n",
-                    'text/plain; charset=utf-8'
-                ],
-                default => [
-                    "HTTP/1.1 404 Not Found\r\n",
-                    "Page not found\n",
-                    'text/plain; charset=utf-8'
-                ]
-            };
+
+            $resHeader = "HTTP/1.1 200 OK\r\n";
+            $resBody = $content;
+
+            $response =
+                $resHeader
+                . "Content-Type: {$contentType}\r\n"
+                . 'Content-Length: '
+                . strlen($resBody)
+                . "\r\n"
+                . "Connection: close\r\n\r\n"
+                . $resBody;
+            $connection->end($response);
+
+            return;
         }
+
+        [$resHeader, $resBody, $contentType] = match ($path) {
+            '/about' => [
+                "HTTP/1.1 200 OK\r\n",
+                "I'm Isvane, a 3rd year college student\n",
+                'text/plain; charset=utf-8'
+            ],
+            default => [
+                "HTTP/1.1 404 Not Found\r\n",
+                "Page not found\n",
+                'text/plain; charset=utf-8'
+            ]
+        };
 
         $response =
             $resHeader
