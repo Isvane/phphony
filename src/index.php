@@ -30,7 +30,7 @@ if (!function_exists('parse_http')) {
         }
 
         $method = $parts[0];
-        $path = $parts[1] ?? '/';
+        $target = $parts[1] ?? '/';
         $headers = [];
 
         foreach ($lines as $line) {
@@ -40,65 +40,19 @@ if (!function_exists('parse_http')) {
             }
         }
 
-        return [
-            'method' => $method,
-            'path' => $path,
-            'headers' => $headers,
-            'offset' => $headerEnd + 4
-        ];
-    }
-}
-
-function get_response(string $resHeader, string $resBody, string $contentType): ?string {
-    return $resHeader
-    . "Content-Type: {$contentType}\r\n"
-    . 'Content-Length: '
-    . strlen($resBody)
-    . "\r\n"
-    . "Connection: close\r\n\r\n"
-    . $resBody;
-}
-
-$server = new SocketServer('127.0.0.1:8000');
-
-$server->on('connection', function (ConnectionInterface $connection) {
-    echo 'New connection from: ' . (string) $connection->getRemoteAddress() . "\n";
-    $buffer = '';
-
-    $connection->on('data', function ($chunk) use ($connection, &$buffer) {
-        $buffer .= (string) $chunk;
-
-        if (!str_contains($buffer, "\r\n\r\n")) {
-            return;
-        }
-
-        $parsed = parse_http($buffer);
-        if ($parsed === null) {
-            $connection->end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
-            return;
-        }
-
-        /** @var array{method: string, path: string, headers: array<string, string>, offset: int} $parsed */
-        $method = $parsed['method'];
-        $target = $parsed['path'];
-        $headers = $parsed['headers'];
-        $offset = $parsed['offset'];
-
-        $contentLength = (int) ( $headers['content-length'] ?? 0 );
+        $offset = $headerEnd + 4;
+        $contentLength = (int) 0;
 
         if (strlen($buffer) < ( $offset + $contentLength )) {
-            return;
-        }
-        $body = substr($buffer, $offset, $contentLength);
-
-        if (strlen($body) < $contentLength) {
-            return;
+            return null;
         }
 
+        $bodyStr = substr($buffer, $offset, $contentLength);
         $parsedBody = [];
-        if (str_contains($headers['content-type'] ?? '', 'application/json')) {
-            /** @var array<string, mixed>|null $decoded */
-            $decoded = json_decode($body, true);
+
+        if (str_contains('', 'application/json')) {
+            /** @var array|null $decoded */
+            $decoded = json_decode($bodyStr, true);
             $parsedBody = is_array($decoded) ? $decoded : [];
         }
 
@@ -110,6 +64,51 @@ $server->on('connection', function (ConnectionInterface $connection) {
         if (is_string($rawQuery)) {
             parse_str($rawQuery, $queryParams);
         }
+
+        return [
+            'method' => $method,
+            'path' => $path,
+            'headers' => $headers,
+            'query' => $queryParams,
+            'body' => $parsedBody
+        ];
+    }
+}
+
+function get_response(string $resHeader, string $resBody, string $contentType): ?string
+{
+    return (
+        $resHeader
+        . "Content-Type: {$contentType}\r\n"
+        . 'Content-Length: '
+        . strlen($resBody)
+        . "\r\n"
+        . "Connection: close\r\n\r\n"
+        . $resBody
+    );
+}
+
+$server = new SocketServer('127.0.0.1:8000');
+
+$server->on('connection', function (ConnectionInterface $connection) {
+    echo 'New connection from: ' . (string) $connection->getRemoteAddress() . "\n";
+    $buffer = '';
+
+    $connection->on('data', function ($chunk) use ($connection, &$buffer) {
+        $buffer .= (string) $chunk;
+
+        $request = parse_http($buffer);
+
+        if ($request === null) {
+            return;
+        }
+
+        /** @var array{method: string, path: string, headers: array<string, string>, query: string, body: string} $request */
+        $method = $request['method'];
+        $path = $request['path'];
+        $headers = $request['headers'];
+        $queryParams = $request['query'];
+        $parsedBody = $request['body'];
 
         echo "Method: {$method}\n";
         echo "Path: {$path}\n";
@@ -165,7 +164,7 @@ $server->on('connection', function (ConnectionInterface $connection) {
         }
 
         [$resHeader, $resBody, $contentType] = match ($path) {
-            '/about' => [
+            '/about', '/api' => [
                 "HTTP/1.1 200 OK\r\n",
                 "I'm Isvane, a 3rd year college student\n",
                 'text/plain; charset=utf-8'
