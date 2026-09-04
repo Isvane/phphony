@@ -49,16 +49,14 @@ if (!function_exists('parse_http')) {
     }
 }
 
-function get_response(string $resHeader, string $resBody, string $contentType) {
-    $response = $resHeader
+function get_response(string $resHeader, string $resBody, string $contentType): ?string {
+    return $resHeader
     . "Content-Type: {$contentType}\r\n"
     . 'Content-Length: '
     . strlen($resBody)
     . "\r\n"
     . "Connection: close\r\n\r\n"
     . $resBody;
-
-    return $response;
 }
 
 $server = new SocketServer('127.0.0.1:8000');
