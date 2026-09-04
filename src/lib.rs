@@ -82,7 +82,7 @@ pub fn parse_http(buffer: &str) -> Option<ZBox<ZendHashTable>> {
     let content_length: usize = req
         .headers
         .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case("conteent-length"))
+        .find(|(k, _)| k.eq_ignore_ascii_case("content-length"))
         .and_then(|(_, v)| v.parse().ok())
         .unwrap_or(0);
 

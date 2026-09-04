@@ -31,6 +31,7 @@ if (!function_exists('parse_http')) {
 
         $method = $parts[0];
         $target = $parts[1] ?? '/';
+        /** @var array<string, string> $headers */
         $headers = [];
 
         foreach ($lines as $line) {
@@ -41,16 +42,16 @@ if (!function_exists('parse_http')) {
         }
 
         $offset = $headerEnd + 4;
-        $contentLength = (int) 0;
+        $contentLength = (int) ($headers['content-length'] ?? 0);
 
-        if (strlen($buffer) < ( $offset + $contentLength )) {
+        if (strlen($buffer) < ($offset + $contentLength)) {
             return null;
         }
 
         $bodyStr = substr($buffer, $offset, $contentLength);
         $parsedBody = [];
 
-        if (str_contains('', 'application/json')) {
+        if (str_contains($headers['content-type'] ?? '', 'application/json')) {
             /** @var array|null $decoded */
             $decoded = json_decode($bodyStr, true);
             $parsedBody = is_array($decoded) ? $decoded : [];
