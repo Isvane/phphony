@@ -42,9 +42,9 @@ if (!function_exists('parse_http')) {
         }
 
         $offset = $headerEnd + 4;
-        $contentLength = (int) ($headers['content-length'] ?? 0);
+        $contentLength = (int) ( $headers['content-length'] ?? 0 );
 
-        if (strlen($buffer) < ($offset + $contentLength)) {
+        if (strlen($buffer) < ( $offset + $contentLength )) {
             return null;
         }
 
@@ -89,6 +89,85 @@ function get_response(string $resHeader, string $resBody, string $contentType): 
     );
 }
 
+function log_request(array $request): void
+{
+    /** @var array{method: string, path: string, headers: array<string, string>, query: string, body: string} $request */
+    echo "Method: {$request['method']}\n";
+    echo "Path: {$request['path']}\n";
+    echo 'Params: ' . json_encode($request['query'], JSON_THROW_ON_ERROR) . "\n";
+    echo 'Headers: ' . json_encode($request['headers'], JSON_THROW_ON_ERROR) . "\n";
+    echo 'Body: ' . json_encode($request['body'], JSON_THROW_ON_ERROR) . "\n";
+}
+
+/**
+ * @return array{0: string, 1: string, 2: string}|null
+ */
+function serve_static_file(string $path): ?array
+{
+    static $mime = [
+        'css' => 'text/css',
+        'html' => 'text/html',
+        'js' => 'application/javascript',
+        'json' => 'application/json',
+        'jpg' => 'image/jpeg',
+        'png' => 'image/png',
+        'pdf' => 'application/pdf',
+        'txt' => 'text/plain'
+    ];
+
+    $relativePath = $path === '/' ? '/index.html' : $path;
+    $publicDir = realpath(__DIR__ . '/../public');
+    $targetFile = realpath((string) $publicDir . '/' . ltrim($relativePath, '/'));
+
+    if (
+        $publicDir === false
+        || $targetFile === false
+        || !str_starts_with($targetFile, $publicDir)
+        || !is_file($targetFile)
+    ) {
+        return null;
+    }
+
+    $ext = pathinfo($targetFile, PATHINFO_EXTENSION);
+    $contentType = $mime[$ext] ?? 'application/octet-stream';
+    $content = file_get_contents($targetFile);
+
+    if ($content === false) {
+        return ["HTTP/1.1 500 Internal Server Error\r\n", "Unable to read file\n", 'text/plain; charset=utf-8'];
+    }
+
+    return ["HTTP/1.1 200 OK\r\n", $content, $contentType];
+}
+
+/**
+ * @return array{0: string, 1: string, 2: string}
+ */
+function dispatch_route(string $path): array
+{
+    return match ($path) {
+        '/about', '/api' => [
+            "HTTP/1.1 200 OK\r\n",
+            "I'm Isvane, a 3rd year college student\n",
+            'text/plain; charset=utf-8'
+        ],
+        default => [
+            "HTTP/1.1 404 Not Found\r\n",
+            "Page not found\n",
+            'text/plain; charset=utf-8'
+        ]
+    };
+}
+
+function handle_request(array $request): string
+{
+    log_request($request);
+
+    $path = (string) ( $request['path'] ?? '/' );
+    [$header, $body, $contentType] = serve_static_file($path) ?? dispatch_route($path);
+
+    return get_response($header, $body, $contentType) ?? '';
+}
+
 $server = new SocketServer('127.0.0.1:8000');
 
 $server->on('connection', function (ConnectionInterface $connection) {
@@ -98,88 +177,9 @@ $server->on('connection', function (ConnectionInterface $connection) {
     $connection->on('data', function ($chunk) use ($connection, &$buffer) {
         $buffer .= (string) $chunk;
 
-        $request = parse_http($buffer);
-
-        if ($request === null) {
-            return;
+        if (( $request = parse_http($buffer) ) !== null) {
+            $connection->end(handle_request($request));
         }
-
-        /** @var array{method: string, path: string, headers: array<string, string>, query: string, body: string} $request */
-        $method = $request['method'];
-        $path = $request['path'];
-        $headers = $request['headers'];
-        $queryParams = $request['query'];
-        $parsedBody = $request['body'];
-
-        echo "Method: {$method}\n";
-        echo "Path: {$path}\n";
-        echo 'Params: ' . json_encode($queryParams, JSON_THROW_ON_ERROR) . "\n";
-        echo 'Headers: ' . json_encode($headers, JSON_THROW_ON_ERROR) . "\n";
-        echo 'Body: ' . json_encode($parsedBody, JSON_THROW_ON_ERROR) . "\n";
-
-        $mime = [
-            'css' => 'text/css',
-            'html' => 'text/html',
-            'js' => 'application/javascript',
-            'json' => 'application/json',
-            'jpg' => 'image/jpeg',
-            'png' => 'image/png',
-            'pdf' => 'application/pdf',
-            'txt' => 'text/plain'
-        ];
-
-        $relativePath = $path === '/' ? '/index.html' : $path;
-        $publicDir = realpath(__DIR__ . '/../public');
-        $targetFile = realpath((string) $publicDir . '/' . ltrim($relativePath, '/'));
-
-        if (
-            $publicDir !== false
-            && $targetFile !== false
-            && str_starts_with($targetFile, $publicDir)
-            && is_file($targetFile)
-        ) {
-            $ext = pathinfo($targetFile, PATHINFO_EXTENSION);
-            $contentType = $mime[$ext] ?? 'application/octet-stream';
-            $content = file_get_contents($targetFile);
-
-            if ($content === false) {
-                $resHeader = "HTTP/1.1 500 Internal Server Error\r\n";
-                $resBody = "Unable to read file\n";
-                $contentType = 'text/plain; charset=utf-8';
-
-                $response = get_response($resHeader, $resBody, $contentType);
-
-                $connection->end($response);
-
-                return;
-            }
-
-            $resHeader = "HTTP/1.1 200 OK\r\n";
-            $resBody = $content;
-
-            $response = get_response($resHeader, $resBody, $contentType);
-
-            $connection->end($response);
-
-            return;
-        }
-
-        [$resHeader, $resBody, $contentType] = match ($path) {
-            '/about', '/api' => [
-                "HTTP/1.1 200 OK\r\n",
-                "I'm Isvane, a 3rd year college student\n",
-                'text/plain; charset=utf-8'
-            ],
-            default => [
-                "HTTP/1.1 404 Not Found\r\n",
-                "Page not found\n",
-                'text/plain; charset=utf-8'
-            ]
-        };
-
-        $response = get_response($resHeader, $resBody, $contentType);
-
-        $connection->end($response);
     });
 });
 
