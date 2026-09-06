@@ -6,41 +6,6 @@ use ext_php_rs::{
     types::{ZendHashTable, Zval},
 };
 
-struct Request<'a> {
-    method: &'a str,
-    path: &'a str,
-    headers: Vec<(String, &'a str)>,
-    offset: usize,
-}
-
-fn parse_internal(buffer: &str) -> Option<Request<'_>> {
-    let mut headers = [httparse::EMPTY_HEADER; 64];
-    let mut req = httparse::Request::new(&mut headers);
-
-    if let Ok(httparse::Status::Complete(offset)) = req.parse(buffer.as_bytes()) {
-        let mut headers_vec = Vec::new();
-
-        for h in req.headers {
-            if h.name.is_empty() {
-                break;
-            }
-
-            if let Ok(val) = std::str::from_utf8(h.value) {
-                let key = h.name.to_lowercase();
-                let _ = headers_vec.push((key, val));
-            }
-        }
-
-        return Some(Request {
-            method: req.method?,
-            path: req.path?,
-            headers: headers_vec,
-            offset,
-        });
-    }
-    None
-}
-
 fn json_to_zval(val: &serde_json::Value) -> Zval {
     let mut zv = Zval::new();
 
@@ -77,56 +42,66 @@ fn json_to_zval(val: &serde_json::Value) -> Zval {
 
 #[php_function]
 pub fn parse_http(buffer: &str) -> Option<ZBox<ZendHashTable>> {
-    let req = parse_internal(buffer)?;
+    let mut headers = [httparse::EMPTY_HEADER; 32];
+    let mut req = httparse::Request::new(&mut headers);
 
-    let content_length: usize = req
-        .headers
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case("content-length"))
-        .and_then(|(_, v)| v.parse().ok())
-        .unwrap_or(0);
-
-    let body_str = match buffer.get(req.offset..(req.offset + content_length)) {
-        Some(body) => body,
-        None => return None,
+    let offset = match req.parse(buffer.as_bytes()) {
+        Ok(httparse::Status::Complete(off)) => off,
+        _ => return None,
     };
 
-    let (path, query_str) = req.path.split_once('?').unwrap_or((req.path, ""));
+    let method = req.method?;
+    let raw_path = req.path?;
+
+    let mut content_length: usize = 0;
+    let mut is_json = false;
+    let mut headers_table = ZendHashTable::new();
+
+    for h in req.headers {
+        if h.name.is_empty() {
+            break;
+        }
+
+        if let Ok(val) = std::str::from_utf8(h.value) {
+            let lower_name = h.name.to_ascii_lowercase();
+
+            if lower_name == "content-length" {
+                content_length = val.parse().unwrap_or(0);
+            } else if lower_name == "content-type" && val.contains("application/json") {
+                is_json = true;
+            }
+
+            let _ = headers_table.insert(lower_name, val);
+        }
+    }
+
+    if buffer.len() < offset + content_length {
+        return None;
+    }
+    let body_str = &buffer[offset..offset + content_length];
+
+    let (path, query_str) = raw_path.split_once('?').unwrap_or((raw_path, ""));
 
     let mut query_table = ZendHashTable::new();
     if !query_str.is_empty() {
-        let parsed_query = form_urlencoded::parse(query_str.as_bytes());
-        for (key, val) in parsed_query {
+        for (key, val) in form_urlencoded::parse(query_str.as_bytes()) {
             let _ = query_table.insert(key.as_ref(), val.as_ref());
         }
     }
 
     let mut body_table = ZendHashTable::new();
-
-    let content_type = req
-        .headers
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
-        .map(|(_, v)| *v)
-        .unwrap_or("");
-
-    if content_type.contains("application/json") {
-        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body_str) {
-            if let serde_json::Value::Object(obj) = json_val {
-                for (k, v) in obj {
-                    let _ = body_table.insert(k.as_str(), json_to_zval(&v));
-                }
+    if is_json && !body_str.is_empty() {
+        if let Ok(serde_json::Value::Object(obj)) =
+            serde_json::from_str::<serde_json::Value>(body_str)
+        {
+            for (k, v) in obj {
+                let _ = body_table.insert(k.as_str(), json_to_zval(&v));
             }
         }
     }
 
-    let mut headers_table = ZendHashTable::new();
-    for (key, val) in req.headers {
-        let _ = headers_table.insert(key, val);
-    }
-
     let mut result = ZendHashTable::new();
-    let _ = result.insert("method", req.method);
+    let _ = result.insert("method", method);
     let _ = result.insert("path", if path.is_empty() { "/" } else { path });
     let _ = result.insert("headers", headers_table);
     let _ = result.insert("query", query_table);
