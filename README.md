@@ -6,24 +6,11 @@ Of course I've done PHP before, but it was forced by school and... I used AI 100
 
 Here, I'm trying to build an HTTP TCP Server using native PHP with some help (ReactPHP) to make it async/non-blocking.
 
-Also, I used Rust FFI for parsing. The performance diff is not that much currently (FFI and serde overhead and stuff) only ~2.5% faster, since its only for a trivial case and the complexity increased, but it's fun! Might optimize later.
+I actually experimented with a Rust FFI extension for parsing this at first. But once you factor in FFI and serialization overhead for a trivial case like this, it was only about 2.5% faster while adding a ton of build complexity. I ended up stripping it out to keep things pure PHP—way simpler to manage
 
-### Native PHP
+### Quick Start
 ```bash
 # Install deps and run
 composer install
-php src/index.php
-```
-
-### Rust FFI
-```bash
-# Install deps
-composer install
-
-# Install cargo-php
-cargo install cargo-php --locked
-
-# Build the release extension and run
-cargo php install --release
 php src/index.php
 ```

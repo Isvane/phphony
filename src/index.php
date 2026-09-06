@@ -8,72 +8,68 @@ use React\Socket\SocketServer;
 use React\Socket\ConnectionInterface;
 
 /**
- * @return array{method: string, path: string, headers: array<string, string>, offset: int}|null
+ * @return array{method: string, path: non-empty-string, headers: array<string, string>, query: array<string, array<array-key, array<array-key, mixed>|string>|string>, body: array<array-key, mixed>}|null
  */
-
-// Fallback for when not using the Rust FFI.
-if (!function_exists('parse_http')) {
-    function parse_http(string $buffer): ?array
-    {
-        $headerEnd = strpos($buffer, "\r\n\r\n");
-        if ($headerEnd === false) {
-            return null;
-        }
-
-        $rawHeaders = substr($buffer, 0, $headerEnd);
-        $lines = explode("\r\n", $rawHeaders);
-        $requestLine = array_shift($lines);
-
-        $parts = explode(' ', $requestLine, 3);
-        if (count($parts) < 2) {
-            return null;
-        }
-
-        $method = $parts[0];
-        $target = $parts[1] ?? '/';
-        /** @var array<string, string> $headers */
-        $headers = [];
-
-        foreach ($lines as $line) {
-            $kv = explode(':', $line, 2);
-            if (count($kv) === 2) {
-                $headers[strtolower(trim($kv[0]))] = trim($kv[1] ?? '');
-            }
-        }
-
-        $offset = $headerEnd + 4;
-        $contentLength = (int) ( $headers['content-length'] ?? 0 );
-
-        if (strlen($buffer) < ( $offset + $contentLength )) {
-            return null;
-        }
-
-        $bodyStr = substr($buffer, $offset, $contentLength);
-        $parsedBody = [];
-
-        if (str_contains($headers['content-type'] ?? '', 'application/json')) {
-            /** @var array|null $decoded */
-            $decoded = json_decode($bodyStr, true);
-            $parsedBody = is_array($decoded) ? $decoded : [];
-        }
-
-        $rawPath = parse_url($target, PHP_URL_PATH);
-        $path = is_string($rawPath) ? $rawPath : '/';
-
-        $rawQuery = parse_url($target, PHP_URL_QUERY);
-        $queryParams = [];
-        if (is_string($rawQuery)) {
-            parse_str($rawQuery, $queryParams);
-        }
-
-        return [
-            'method' => $method,
-            'path' => $path,
-            'headers' => $headers,
-            'query' => $queryParams,
-            'body' => $parsedBody
-        ];
+function parse_http(string $buffer): ?array
+{
+    $headerEnd = strpos($buffer, "\r\n\r\n");
+    if ($headerEnd === false) {
+        return null;
     }
+
+    $rawHeaders = substr($buffer, 0, $headerEnd);
+    $lines = explode("\r\n", $rawHeaders);
+    $requestLine = array_shift($lines);
+
+    $parts = explode(' ', $requestLine, 3);
+    if (count($parts) < 2) {
+        return null;
+    }
+
+    $method = $parts[0];
+    $target = $parts[1] ?? '/';
+    /** @var array<string, string> $headers */
+    $headers = [];
+
+    foreach ($lines as $line) {
+        $kv = explode(':', $line, 2);
+        if (count($kv) === 2) {
+            $headers[strtolower(trim($kv[0]))] = trim($kv[1] ?? '');
+        }
+    }
+
+    $offset = $headerEnd + 4;
+    $contentLength = (int) ( $headers['content-length'] ?? 0 );
+
+    if (strlen($buffer) < ( $offset + $contentLength )) {
+        return null;
+    }
+
+    $bodyStr = substr($buffer, $offset, $contentLength);
+    $parsedBody = [];
+
+    if (str_contains($headers['content-type'] ?? '', 'application/json')) {
+        /** @var array|null $decoded */
+        $decoded = json_decode($bodyStr, true);
+        $parsedBody = is_array($decoded) ? $decoded : [];
+    }
+
+    $rawPath = parse_url($target, PHP_URL_PATH);
+    $path = is_string($rawPath) ? $rawPath : '/';
+
+    $rawQuery = parse_url($target, PHP_URL_QUERY);
+    $queryParams = [];
+    if (is_string($rawQuery)) {
+        parse_str($rawQuery, $queryParams);
+    }
+
+    return [
+        'method' => $method,
+        'path' => $path,
+        'headers' => $headers,
+        'query' => $queryParams,
+        'body' => $parsedBody
+    ];
 }
 
 function get_response(string $resHeader, string $resBody, string $contentType): ?string
