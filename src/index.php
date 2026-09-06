@@ -169,9 +169,15 @@ $server = new SocketServer('127.0.0.1:8000');
 $server->on('connection', function (ConnectionInterface $connection) {
     echo 'New connection from: ' . (string) $connection->getRemoteAddress() . "\n";
     $buffer = '';
+    $maxBufferSize = 65_536;
 
-    $connection->on('data', function ($chunk) use ($connection, &$buffer) {
+    $connection->on('data', function ($chunk) use ($connection, &$buffer, $maxBufferSize) {
         $buffer .= (string) $chunk;
+
+        if (strlen($buffer) > $maxBufferSize) {
+            $connection->end("HTTP/1.1 431 Request Header Fields Too Large\r\n\r\n");
+            return;
+        }
 
         if (( $request = parse_http($buffer) ) !== null) {
             $connection->end(handle_request($request));
