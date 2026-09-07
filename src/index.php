@@ -138,12 +138,17 @@ function serve_static_file(string $path): ?array
 /**
  * @return array{0: string, 1: string, 2: string}
  */
-function dispatch_route(string $path): array
+function dispatch_route(string $method, string $path): array
 {
-    return match ($path) {
+    return match ("{$method} {$path}") {
         '/about', '/api' => [
             "HTTP/1.1 200 OK\r\n",
             "I'm Isvane, a 3rd year college student\n",
+            'text/plain; charset=utf-8'
+        ],
+        'POST /api' => [
+            "HTTP/1.1 200 OK\r\n",
+            "Data received\n",
             'text/plain; charset=utf-8'
         ],
         default => [
@@ -158,8 +163,9 @@ function handle_request(array $request): string
 {
     log_request($request);
 
+    $method = (string) ( $request['method'] ?? '/' );
     $path = (string) ( $request['path'] ?? '/' );
-    [$header, $body, $contentType] = serve_static_file($path) ?? dispatch_route($path);
+    [$header, $body, $contentType] = serve_static_file($path) ?? dispatch_route($method, $path);
 
     return get_response($header, $body, $contentType) ?? '';
 }
