@@ -141,7 +141,7 @@ function serve_static_file(string $path): ?array
 function dispatch_route(string $method, string $path): array
 {
     return match ("{$method} {$path}") {
-        '/about', '/api' => [
+        'GET /about', 'GET /api' => [
             "HTTP/1.1 200 OK\r\n",
             "I'm Isvane, a 3rd year college student\n",
             'text/plain; charset=utf-8'
